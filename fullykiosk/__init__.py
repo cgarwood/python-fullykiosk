@@ -63,3 +63,9 @@ class FullyKiosk:
 
     def stopSound(self):
         return self.sendCommand("stopSound")
+
+    def toForeground(self):
+        return self.sendCommand("toForeground")
+
+    def startApplication(self, application):
+        return self.sendCommand("startApplication", package=application)
