@@ -61,5 +61,5 @@ class FullyKiosk:
     def playSound(self, url):
         return self.sendCommand("playSound", url=url)
 
-    def stopSound(self)
+    def stopSound(self):
         return self.sendCommand("stopSound")
