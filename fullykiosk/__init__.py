@@ -69,3 +69,8 @@ class FullyKiosk:
 
     def startApplication(self, application):
         return self.sendCommand("startApplication", package=application)
+
+    def setConfigurationString(self, setting, stringValue):
+        return self.sendCommand(
+            "setStringSetting", key=setting, value=stringValue
+        )
