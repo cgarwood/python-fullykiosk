@@ -18,10 +18,9 @@ class FullyKiosk:
 
         try:
             result = json.loads(requests.get(url, timeout=10).content)
+            return result
         except requests.exceptions.Timeout:
             print("Timeout error")
-
-        return result
 
     def getDeviceInfo(self):
         result = self.sendCommand("deviceInfo")
@@ -74,3 +73,9 @@ class FullyKiosk:
         return self.sendCommand(
             "setStringSetting", key=setting, value=stringValue
         )
+
+    def enableLockedMode(self):
+        return self.sendCommand("enableLockedMode")
+
+    def disableLockedMode(self):
+        return self.sendCommand("disableLockedMode")
