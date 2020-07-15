@@ -79,3 +79,9 @@ class FullyKiosk:
 
     def disableLockedMode(self):
         return self.sendCommand("disableLockedMode")
+
+    def lockKiosk(self):
+        return self.sendCommand("lockKiosk")
+
+    def unlockKiosk(self):
+        return self.sendCommand("unlockKiosk")
