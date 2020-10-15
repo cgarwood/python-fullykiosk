@@ -14,7 +14,8 @@ class FullyKiosk:
     def sendCommand(self, cmd, **kwargs):
         url = f"http://{self.host}:{self.port}/?cmd={cmd}&password={self.password}&type=json"
         for key, value in kwargs.items():
-            url = url + f"&{key}={value}"
+            if value is not None:
+                url = url + f"&{key}={value}"
 
         try:
             result = json.loads(requests.get(url, timeout=10).content)
@@ -48,6 +49,11 @@ class FullyKiosk:
             "setStringSetting", key="screenBrightness", value=brightness
         )
 
+    def setAudioVolume(self, volume, stream=None):
+        return self.sendCommand(
+            "setAudioVolume", volume=volume, stream=stream
+        )
+
     def restartApp(self):
         return self.sendCommand("restartApp")
 
@@ -57,8 +63,8 @@ class FullyKiosk:
     def loadUrl(self, url):
         return self.sendCommand("loadUrl", url=url)
 
-    def playSound(self, url):
-        return self.sendCommand("playSound", url=url)
+    def playSound(self, url, stream=None):
+        return self.sendCommand("playSound", url=url, stream=stream)
 
     def stopSound(self):
         return self.sendCommand("stopSound")
@@ -72,6 +78,11 @@ class FullyKiosk:
     def setConfigurationString(self, setting, stringValue):
         return self.sendCommand(
             "setStringSetting", key=setting, value=stringValue
+        )
+
+    def setConfigurationBool(self, setting, boolValue):
+        return self.sendCommand(
+            "setBooleanSetting", key=setting, value=boolValue
         )
 
     def enableLockedMode(self):
