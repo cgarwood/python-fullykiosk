@@ -50,9 +50,7 @@ class FullyKiosk:
         )
 
     def setAudioVolume(self, volume, stream=None):
-        return self.sendCommand(
-            "setAudioVolume", volume=volume, stream=stream
-        )
+        return self.sendCommand("setAudioVolume", volume=volume, stream=stream)
 
     def restartApp(self):
         return self.sendCommand("restartApp")
@@ -76,14 +74,10 @@ class FullyKiosk:
         return self.sendCommand("startApplication", package=application)
 
     def setConfigurationString(self, setting, stringValue):
-        return self.sendCommand(
-            "setStringSetting", key=setting, value=stringValue
-        )
+        return self.sendCommand("setStringSetting", key=setting, value=stringValue)
 
     def setConfigurationBool(self, setting, boolValue):
-        return self.sendCommand(
-            "setBooleanSetting", key=setting, value=boolValue
-        )
+        return self.sendCommand("setBooleanSetting", key=setting, value=boolValue)
 
     def enableLockedMode(self):
         return self.sendCommand("enableLockedMode")
@@ -96,3 +90,6 @@ class FullyKiosk:
 
     def unlockKiosk(self):
         return self.sendCommand("unlockKiosk")
+
+    def rebootDevice(self):
+        return self.sendCommand("rebootDevice")
