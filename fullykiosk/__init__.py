@@ -1,30 +1,24 @@
+import aiohttp
 import json
 import logging
 import requests
 
+from .exceptions import FullyKioskError
+
+_LOGGER = logging.getLogger(__name__)
+
 
 class FullyKiosk:
-    def __init__(self, host, port, password):
-        self.host = host
-        self.port = port
-        self.password = password
-
+    def __init__(self, session, host, port, password):
+        self._rh = _RequestsHandler(session, host, port)
+        self._password = password
         self._deviceInfo = None
 
     def sendCommand(self, cmd, **kwargs):
-        url = f"http://{self.host}:{self.port}/?cmd={cmd}&password={self.password}&type=json"
-        for key, value in kwargs.items():
-            if value is not None:
-                url = url + f"&{key}={value}"
+        return self._rh.get(cmd=cmd, password=self._password, type="json", **kwargs)
 
-        try:
-            result = json.loads(requests.get(url, timeout=10).content)
-            return result
-        except requests.exceptions.Timeout:
-            print("Timeout error")
-
-    def getDeviceInfo(self):
-        result = self.sendCommand("deviceInfo")
+    async def getDeviceInfo(self):
+        result = await self.sendCommand("deviceInfo")
         self._deviceInfo = result
         return self._deviceInfo
 
@@ -32,64 +26,98 @@ class FullyKiosk:
     def deviceInfo(self):
         return self._deviceInfo
 
-    def startScreensaver(self):
-        return self.sendCommand("startScreensaver")
+    async def startScreensaver(self):
+        await self.sendCommand("startScreensaver")
 
-    def stopScreensaver(self):
-        return self.sendCommand("stopScreensaver")
+    async def stopScreensaver(self):
+        await self.sendCommand("stopScreensaver")
 
-    def screenOn(self):
-        return self.sendCommand("screenOn")
+    async def screenOn(self):
+        await self.sendCommand("screenOn")
 
-    def screenOff(self):
-        return self.sendCommand("screenOff")
+    async def screenOff(self):
+        await self.sendCommand("screenOff")
 
-    def setScreenBrightness(self, brightness):
-        return self.sendCommand(
+    async def setScreenBrightness(self, brightness):
+        await self.sendCommand(
             "setStringSetting", key="screenBrightness", value=brightness
         )
 
-    def setAudioVolume(self, volume, stream=None):
-        return self.sendCommand("setAudioVolume", volume=volume, stream=stream)
+    async def setAudioVolume(self, volume, stream=None):
+        await self.sendCommand("setAudioVolume", level=volume, stream=stream)
 
-    def restartApp(self):
-        return self.sendCommand("restartApp")
+    async def restartApp(self):
+        await self.sendCommand("restartApp")
 
-    def loadStartUrl(self):
-        return self.sendCommand("loadStartUrl")
+    async def loadStartUrl(self):
+        await self.sendCommand("loadStartUrl")
 
-    def loadUrl(self, url):
-        return self.sendCommand("loadUrl", url=url)
+    async def loadUrl(self, url):
+        await self.sendCommand("loadUrl", url=url)
 
-    def playSound(self, url, stream=None):
-        return self.sendCommand("playSound", url=url, stream=stream)
+    async def playSound(self, url, stream=None):
+        await self.sendCommand("playSound", url=url, stream=stream)
 
-    def stopSound(self):
-        return self.sendCommand("stopSound")
+    async def stopSound(self):
+        await self.sendCommand("stopSound")
 
-    def toForeground(self):
-        return self.sendCommand("toForeground")
+    async def toForeground(self):
+        await self.sendCommand("toForeground")
 
-    def startApplication(self, application):
-        return self.sendCommand("startApplication", package=application)
+    async def startApplication(self, application):
+        await self.sendCommand("startApplication", package=application)
 
-    def setConfigurationString(self, setting, stringValue):
-        return self.sendCommand("setStringSetting", key=setting, value=stringValue)
+    async def setConfigurationString(self, setting, stringValue):
+        await self.sendCommand("setStringSetting", key=setting, value=stringValue)
 
-    def setConfigurationBool(self, setting, boolValue):
-        return self.sendCommand("setBooleanSetting", key=setting, value=boolValue)
+    async def setConfigurationBool(self, setting, boolValue):
+        await self.sendCommand("setBooleanSetting", key=setting, value=boolValue)
 
-    def enableLockedMode(self):
-        return self.sendCommand("enableLockedMode")
+    async def enableLockedMode(self):
+        await self.sendCommand("enableLockedMode")
 
-    def disableLockedMode(self):
-        return self.sendCommand("disableLockedMode")
+    async def disableLockedMode(self):
+        await self.sendCommand("disableLockedMode")
 
-    def lockKiosk(self):
-        return self.sendCommand("lockKiosk")
+    async def lockKiosk(self):
+        await self.sendCommand("lockKiosk")
 
-    def unlockKiosk(self):
-        return self.sendCommand("unlockKiosk")
+    async def unlockKiosk(self):
+        await self.sendCommand("unlockKiosk")
 
-    def rebootDevice(self):
-        return self.sendCommand("rebootDevice")
+    async def rebootDevice(self):
+        await self.sendCommand("rebootDevice")
+
+
+class _RequestsHandler:
+    """Internal class to create FullyKiosk requests"""
+
+    def __init__(self, session: aiohttp.ClientSession, host, port):
+        self.headers = {"Accept": "application/json"}
+
+        self.session = session
+        self.host = host
+        self.port = port
+
+    async def get(self, **kwargs):
+        url = f"http://{self.host}:{self.port}"
+        params = []
+
+        for key, value in kwargs.items():
+            if value is not None:
+                params.append((key, str(value)))
+
+        _LOGGER.debug("Sending request to: %s", url)
+        _LOGGER.debug("Parameters: %s", params)
+        async with self.session.get(
+            url, headers=self.headers, params=params
+        ) as response:
+            if response.status != 200:
+                _LOGGER.warning(
+                    "Invalid response from Fully Kiosk Browser API: %s", response.status
+                )
+                raise FullyKioskError(response.status, await response.text())
+
+            data = await response.json(content_type="text/html")
+            _LOGGER.debug(json.dumps(data))
+            return data
