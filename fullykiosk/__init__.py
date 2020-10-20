@@ -7,6 +7,10 @@ from .exceptions import FullyKioskError
 
 _LOGGER = logging.getLogger(__name__)
 
+RESPONSE_STATUS = "status"
+RESPONSE_STATUSTEXT = "statustext"
+RESPONSE_ERRORSTATUS = "Error"
+
 
 class FullyKiosk:
     def __init__(self, session, host, port, password):
@@ -14,8 +18,13 @@ class FullyKiosk:
         self._password = password
         self._deviceInfo = None
 
-    def sendCommand(self, cmd, **kwargs):
-        return self._rh.get(cmd=cmd, password=self._password, type="json", **kwargs)
+    async def sendCommand(self, cmd, **kwargs):
+        data = await self._rh.get(
+            cmd=cmd, password=self._password, type="json", **kwargs
+        )
+        if RESPONSE_STATUS in data and data[RESPONSE_STATUS] == RESPONSE_ERRORSTATUS:
+            raise FullyKioskError(RESPONSE_ERRORSTATUS, data[RESPONSE_STATUSTEXT])
+        return data
 
     async def getDeviceInfo(self):
         result = await self.sendCommand("deviceInfo")
