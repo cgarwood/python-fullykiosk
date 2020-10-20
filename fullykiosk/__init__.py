@@ -1,7 +1,6 @@
 import aiohttp
 import json
 import logging
-import requests
 
 from .exceptions import FullyKioskError
 
