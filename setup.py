@@ -1,4 +1,4 @@
-"""Setup module for python-openzwave-mqtt."""
+"""Setup module for python-fullykiosk."""
 from pathlib import Path
 
 from setuptools import find_packages, setup
