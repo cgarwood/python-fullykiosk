@@ -40,6 +40,7 @@ class FullyKiosk:
     def deviceInfo(self):
         return self._deviceInfo
 
+    @property
     def settings(self):
         return self._settings
 
@@ -104,7 +105,7 @@ class FullyKiosk:
 
     async def enableMotionDetection(self):
         await self.setConfigurationBool("motionDetection", True)
-    
+
     async def disableMotionDetection(self):
         await self.setConfigurationBool("motionDetection", False)
 
