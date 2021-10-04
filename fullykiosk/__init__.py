@@ -142,6 +142,10 @@ class _RequestsHandler:
                 )
                 raise FullyKioskError(response.status, await response.text())
 
-            data = await response.json(content_type="text/html")
+            try:
+                data = await response.json()
+            except aiohttp.client_exceptions.ContentTypeError:
+                data = await response.json(content_type="text/html")
+
             _LOGGER.debug(json.dumps(data))
             return data
