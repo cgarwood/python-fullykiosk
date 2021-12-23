@@ -81,6 +81,9 @@ class FullyKiosk:
 
     async def toForeground(self):
         await self.sendCommand("toForeground")
+    
+    async def toBackground(self):
+        await self.sendCommand("toBackground")
 
     async def startApplication(self, application):
         await self.sendCommand("startApplication", package=application)
