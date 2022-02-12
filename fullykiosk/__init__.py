@@ -59,6 +59,7 @@ class FullyKiosk:
         self._device_id = device_info["deviceID"]
         self._mqtt_enabled = self._settings["mqttEnabled"]
         if self._mqtt_enabled and self._use_mqtt_if_available:
+            _LOGGER.debug("MQTT is enabled!")
             self._mqtt_device_info_topic = self._settings["mqttDeviceInfoTopic"]
             broker_url_parts = (
                 str(self._settings["mqttBrokerUrl"])
@@ -181,6 +182,11 @@ class FullyKiosk:
         """Retrieve device info using REST"""
         result = await self.sendCommand("deviceInfo")
         self._device_info = result
+        if self._rh.host != result["ip4"]:
+            _LOGGER.info(
+                "Device %1s IP address is changed to %2s.", self._rh.host, result["ip4"]
+            )
+            self._rh.host = result["ip4"]
         return result
 
     async def get_settings(self):
