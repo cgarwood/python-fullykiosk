@@ -12,8 +12,11 @@ RESPONSE_ERRORSTATUS = "Error"
 
 
 class FullyKiosk:
-    def __init__(self, session, host, port, password):
-        self._rh = _RequestsHandler(session, host, port)
+    def __init__(self, session, host, port, password, use_ssl=True, verify_ssl=True):
+        if not use_ssl:
+            verify_ssl = False
+        self._rh = _RequestsHandler(session, host, port, use_ssl=use_ssl,
+                                    verify_ssl=verify_ssl)
         self._password = password
         self._deviceInfo = None
         self._settings = None
@@ -119,26 +122,30 @@ class FullyKiosk:
 class _RequestsHandler:
     """Internal class to create FullyKiosk requests"""
 
-    def __init__(self, session: aiohttp.ClientSession, host, port):
+    def __init__(self, session: aiohttp.ClientSession, host, port, use_ssl=True,
+                 verify_ssl=True):
         self.headers = {"Accept": "application/json"}
 
         self.session = session
         self.host = host
         self.port = port
+        self.use_ssl = use_ssl
+        self.verify_ssl = verify_ssl
 
     async def get(self, **kwargs):
-        url = f"http://{self.host}:{self.port}"
+        url = f"http{'s' if self.use_ssl else ''}://{self.host}:{self.port}"
         params = []
 
         for key, value in kwargs.items():
             if value is not None:
                 params.append((key, str(value)))
+        req_params = {"url": url, "headers": self.headers, "params": params}
+        if not self.verify_ssl:
+            req_params["ssl"] = False
 
         _LOGGER.debug("Sending request to: %s", url)
         _LOGGER.debug("Parameters: %s", params)
-        async with self.session.get(
-            url, headers=self.headers, params=params
-        ) as response:
+        async with self.session.get(**req_params) as response:
             if response.status != 200:
                 _LOGGER.warning(
                     "Invalid response from Fully Kiosk Browser API: %s", response.status
