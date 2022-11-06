@@ -55,6 +55,7 @@ htmlcov/
 test-reports/
 test-results.xml
 test-output.xml
+test.py
 
 # Translations
 *.mo
@@ -99,4 +100,6 @@ virtualization/vagrant/config
 
 # Typing
 .mypy_cache
+
+# Test file
 test.py
