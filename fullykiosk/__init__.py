@@ -1,8 +1,10 @@
-import aiohttp
+from typing import Callable
 import json
 import logging
 
 from .exceptions import FullyKioskError
+from .models import FullyKioskMqttClient, RequestsHandler
+from paho.mqtt.client import Client, MQTTMessage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -12,11 +14,75 @@ RESPONSE_ERRORSTATUS = "Error"
 
 
 class FullyKiosk:
+
+    _rh:RequestsHandler = None
+    _password:str = None
+    _deviceInfo:str = None
+    _settings:str = None
+    _device_id:str = None
+    _app_id: str = "fully"
+    _mqtt_event_callback: Callable[[str], None] = None
+    _mqtt_enabled:bool = False
+
+    @property
+    def mqttEnableds(self):
+        return self._mqtt_enabled
+
     def __init__(self, session, host, port, password):
-        self._rh = _RequestsHandler(session, host, port)
+        self._rh = RequestsHandler(session, host, port)
         self._password = password
         self._deviceInfo = None
         self._settings = None
+    
+    async def start(self, mqtt_event_callback:Callable[[str], None] = None) -> None:
+        """Initialize the mqtt client if it's enable in the Fully Kiosk Settings"""
+        self._mqtt_event_callback = mqtt_event_callback
+        self._deviceInfo = await self.getDeviceInfo()
+        self._settings = await self.getSettings()
+        self._device_id = self._deviceInfo["deviceID"]
+        self._mqtt_enabled = self._settings["mqttEnabled"]
+
+        if not self._mqtt_enabled:
+            return
+        
+        mqtt_client = await self._create_client()
+        mqtt_client.connect()
+
+    def _replace_ids(self, input:str) -> str:
+        return input.replace('$appId', self._app_id).replace('$deviceId', self._device_id).replace('$event', '+')
+
+    async def _create_client(self) -> FullyKioskMqttClient:
+        """Create a mqtt client"""
+        broker_url_parts = (
+            str(self._settings["mqttBrokerUrl"])
+            .replace("http://", "")
+            .split(":", maxsplit=1)
+        )
+        client_id = f"ha-{self._settings['mqttClientId']}"
+        broker_host = broker_url_parts[0]
+        broker_port = int(broker_url_parts[1])
+        username = self._settings["mqttBrokerUsername"]
+        password = self._settings["mqttBrokerPassword"]
+
+        def on_connect(client:Client):
+            deviceInfoTopic = self._replace_ids(self._settings["mqttDeviceInfoTopic"])
+            eventTopic = self._replace_ids(self._settings["mqttEventTopic"])
+            client.subscribe(deviceInfoTopic)
+            client.subscribe(eventTopic)
+        
+        def on_message(message:MQTTMessage):
+            json_payload = json.loads(message.payload)
+            message_topic_parts = message.topic.split("/")
+            message_type = message_topic_parts[1]
+            event_type = message_type
+            if message_type == "deviceInfo":
+                self._device_info = json_payload
+            elif message_type == "event":
+                event_type = message_topic_parts[2]
+            if self._mqtt_event_callback:
+                self._mqtt_event_callback(event_type)           
+        
+        return FullyKioskMqttClient(broker_host, broker_port, client_id, username, password, on_message, on_connect)
 
     async def sendCommand(self, cmd, **kwargs):
         data = await self._rh.get(
@@ -114,41 +180,3 @@ class FullyKiosk:
 
     async def rebootDevice(self):
         await self.sendCommand("rebootDevice")
-
-
-class _RequestsHandler:
-    """Internal class to create FullyKiosk requests"""
-
-    def __init__(self, session: aiohttp.ClientSession, host, port):
-        self.headers = {"Accept": "application/json"}
-
-        self.session = session
-        self.host = host
-        self.port = port
-
-    async def get(self, **kwargs):
-        url = f"http://{self.host}:{self.port}"
-        params = []
-
-        for key, value in kwargs.items():
-            if value is not None:
-                params.append((key, str(value)))
-
-        _LOGGER.debug("Sending request to: %s", url)
-        _LOGGER.debug("Parameters: %s", params)
-        async with self.session.get(
-            url, headers=self.headers, params=params
-        ) as response:
-            if response.status != 200:
-                _LOGGER.warning(
-                    "Invalid response from Fully Kiosk Browser API: %s", response.status
-                )
-                raise FullyKioskError(response.status, await response.text())
-
-            try:
-                data = await response.json()
-            except aiohttp.client_exceptions.ContentTypeError:
-                data = await response.json(content_type="text/html")
-
-            _LOGGER.debug(json.dumps(data))
-            return data

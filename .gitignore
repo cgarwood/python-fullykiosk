@@ -99,3 +99,4 @@ virtualization/vagrant/config
 
 # Typing
 .mypy_cache
+test.py
