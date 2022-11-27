@@ -12,7 +12,7 @@ RESPONSE_ERRORSTATUS = "Error"
 
 
 class FullyKiosk:
-    def __init__(self, session, host, port, password, use_ssl=True, verify_ssl=True):
+    def __init__(self, session, host, port, password, use_ssl=False, verify_ssl=False):
         if not use_ssl:
             verify_ssl = False
         self._rh = _RequestsHandler(session, host, port, use_ssl=use_ssl,
@@ -122,8 +122,8 @@ class FullyKiosk:
 class _RequestsHandler:
     """Internal class to create FullyKiosk requests"""
 
-    def __init__(self, session: aiohttp.ClientSession, host, port, use_ssl=True,
-                 verify_ssl=True):
+    def __init__(self, session: aiohttp.ClientSession, host, port, use_ssl=False,
+                 verify_ssl=False):
         self.headers = {"Accept": "application/json"}
 
         self.session = session
