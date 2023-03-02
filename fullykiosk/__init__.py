@@ -118,6 +118,15 @@ class FullyKiosk:
     async def rebootDevice(self):
         await self.sendCommand("rebootDevice")
 
+    async def clearCache(self):
+        await self.sendCommand("clearCache")
+    
+    async def clearWebstorage(self):
+        await self.clearWebstorage("clearWebstorage")
+    
+    async def clearCookies(self):
+        await self.clearCookies("clearCookies")
+
 
 class _RequestsHandler:
     """Internal class to create FullyKiosk requests"""
