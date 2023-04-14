@@ -83,7 +83,7 @@ class FullyKiosk:
         await self.sendCommand("stopSound")
 
     async def textToSpeech(self):
-        await self.sendCommand("textToSpeech")
+        await self.sendCommand("textToSpeech", text="", locale="", engine="")
         
     async def toForeground(self):
         await self.sendCommand("toForeground")
