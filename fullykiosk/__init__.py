@@ -127,6 +127,9 @@ class FullyKiosk:
     async def clearCookies(self):
         await self.sendCommand("clearCookies")
 
+    async def getCamshot(self):
+        return await self._rh.get(cmd="getCamshot", password=self._password)
+
 
 class _RequestsHandler:
     """Internal class to create FullyKiosk requests"""
@@ -161,10 +164,10 @@ class _RequestsHandler:
                 )
                 raise FullyKioskError(response.status, await response.text())
 
-            try:
-                data = await response.json()
-            except aiohttp.client_exceptions.ContentTypeError:
-                data = await response.json(content_type="text/html")
+            content_type = response.headers['Content-Type']
+            if content_type.startswith("image/"):
+                return await response.content.read()
+            data = await response.json(content_type=content_type)
 
             _LOGGER.debug(json.dumps(data))
             return data
