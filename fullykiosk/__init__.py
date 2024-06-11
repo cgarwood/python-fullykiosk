@@ -122,10 +122,10 @@ class FullyKiosk:
         await self.sendCommand("clearCache")
     
     async def clearWebstorage(self):
-        await self.clearWebstorage("clearWebstorage")
+        await self.sendCommand("clearWebstorage")
     
     async def clearCookies(self):
-        await self.clearCookies("clearCookies")
+        await self.sendCommand("clearCookies")
 
 
 class _RequestsHandler:
