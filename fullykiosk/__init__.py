@@ -130,6 +130,9 @@ class FullyKiosk:
     async def getCamshot(self):
         return await self._rh.get(cmd="getCamshot", password=self._password)
 
+    async def getScreenshot(self):
+        return await self._rh.get(cmd="getScreenshot", password=self._password)
+
 
 class _RequestsHandler:
     """Internal class to create FullyKiosk requests"""
