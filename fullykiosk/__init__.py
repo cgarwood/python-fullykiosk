@@ -165,7 +165,7 @@ class _RequestsHandler:
                 raise FullyKioskError(response.status, await response.text())
 
             content_type = response.headers['Content-Type']
-            if content_type.startswith("image/"):
+            if content_type.startswith("image/") or content_type == "application/octet-stream":
                 return await response.content.read()
             data = await response.json(content_type=content_type)
 
