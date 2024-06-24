@@ -31,5 +31,6 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Topic :: Home Automation",
+        "License :: OSI Approved :: Apache Software License",
     ],
 )
