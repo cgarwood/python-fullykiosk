@@ -34,6 +34,8 @@ class FullyKiosk:
             raise FullyKioskError(RESPONSE_ERRORSTATUS, data[RESPONSE_STATUSTEXT])
         return data
 
+    # REST API Documentation: https://www.fully-kiosk.com/en/#rest
+
     async def getDeviceInfo(self):
         result = await self.sendCommand("deviceInfo")
         self._deviceInfo = result
@@ -77,11 +79,13 @@ class FullyKiosk:
     async def stopScreensaver(self):
         await self.sendCommand("stopScreensaver")
 
+    # Daydream: max Android 12
+
     async def startDaydream(self):
-        await self.sendCommand("startScreensaver")
+        await self.sendCommand("startDaydream")
 
     async def stopDaydream(self):
-        await self.sendCommand("stopScreensaver")
+        await self.sendCommand("stopDaydream")
 
     async def setScreenBrightness(self, brightness):
         await self.setConfigurationString("screenBrightness", brightness)
