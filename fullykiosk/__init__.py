@@ -22,7 +22,7 @@ class FullyKiosk:
         self._settings = None
 
     async def sendCommand(self, cmd, **kwargs):
-        data = await self._rh.get(
+        data = await self._rh.post(
             cmd=cmd, password=self._password, type="json", **kwargs
         )
 
@@ -201,20 +201,24 @@ class _RequestsHandler:
         self.use_ssl = use_ssl
         self.verify_ssl = verify_ssl
 
-    async def get(self, **kwargs):
+    async def post(self, **kwargs):
         url = f"http{'s' if self.use_ssl else ''}://{self.host}:{self.port}"
         params = []
+        payload = {}
 
         for key, value in kwargs.items():
             if value is not None:
-                params.append((key, str(value)))
-        req_params = {"url": url, "headers": self.headers, "params": params}
+                if key == "password":
+                    payload[key] = str(value)
+                else:
+                    params.append((key, str(value)))
+        req_params = {"url": url, "headers": self.headers, "params": params, "data": payload}
         if not self.verify_ssl:
             req_params["ssl"] = False
 
         _LOGGER.debug("Sending request to: %s", url)
         _LOGGER.debug("Parameters: %s", params)
-        async with self.session.get(**req_params) as response:
+        async with self.session.post(**req_params) as response:
             if response.status != 200:
                 _LOGGER.warning(
                     "Invalid response from Fully Kiosk Browser API: %s", response.status
