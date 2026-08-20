@@ -186,7 +186,8 @@ class FullyKiosk:
         Inject JavaScript into Fully Kiosk Browser.
 
         If `url` is provided, the injected script is wrapped so it only executes when
-        the current page URL exactly matches the provided value.
+        the current page URL exactly matches the provided value. If `url` is not
+        provided, the script is injected into all tabs.
         """
         if url is not None:
             code = (
