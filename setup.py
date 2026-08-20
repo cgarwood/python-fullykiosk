@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 
 PROJECT_DIR = Path(__file__).parent.resolve()
 README_FILE = PROJECT_DIR / "README.md"
-VERSION = "0.0.12"
+VERSION = "0.0.15"
 
 
 setup(
@@ -31,5 +31,6 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Topic :: Home Automation",
+        "License :: OSI Approved :: Apache Software License",
     ],
 )

@@ -9,19 +9,19 @@ jobs:
     name: Builds and publishes releases to PyPI
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
-      - name: Set up Python 3.7
-        uses: actions/setup-python@v1
+      - uses: actions/checkout@v6
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
         with:
-          python-version: 3.7
-      - name: Install wheel
+          python-version: 3.13
+      - name: Install build
         run: >-
-          pip install wheel
+          pip install build
       - name: Build
         run: >-
-          python3 setup.py sdist bdist_wheel
+          python3 -m build
       - name: Publish release to PyPI
-        uses: pypa/gh-action-pypi-publish@master
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_TOKEN }}
