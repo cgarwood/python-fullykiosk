@@ -153,8 +153,47 @@ class FullyKiosk:
     async def loadStartUrl(self):
         await self.sendCommand("loadStartUrl")
 
-    async def loadUrl(self, url):
-        await self.sendCommand("loadUrl", url=url)
+    async def loadUrl(self, url: str, tab: int=None, newtab: bool=None):
+        """
+        Load a URL in Fully.
+        :param url: URL to load.
+        :param tab: Optional tab index [0..n] to load the URL in. If not specified, 
+        the URL will be loaded in the current tab.
+        :param newtab: Optional flag to open the URL in a new tab. If not specified, 
+        the URL will be loaded in the current tab.
+        """
+        await self.sendCommand("loadUrl", url=url, tab=tab, newtab="1" if newtab is True else None)
+
+    async def focusTab(self, tab: int):
+        """
+        Focus on a specific tab.
+        :param tab: Tab index [0..n] to focus on.
+        """
+        await self.sendCommand("focusTab", tab=tab)
+
+    async def closeTab(self, tab: int):
+        """
+        Close a specific tab.
+        :param tab: Tab index [0..n] to close.
+        """
+        await self.sendCommand("closeTab", tab=tab)
+
+    async def refreshTab(self):
+        await self.sendCommand("refreshTab")
+
+    async def injectJavascript(self, code: str, url: str | None = None):
+        """
+        Inject JavaScript into Fully Kiosk Browser.
+
+        If `url` is provided, the injected script is wrapped so it only executes when
+        the current page URL exactly matches the provided value. If `url` is not
+        provided, the script is injected into all tabs.
+        """
+        if url is not None:
+            code = (
+                f"if (location.href === {json.dumps(url)}) {{ {code} }}"
+            )
+        await self.sendCommand("injectJavascript", code=code)
 
     async def clearCache(self):
         await self.sendCommand("clearCache")
