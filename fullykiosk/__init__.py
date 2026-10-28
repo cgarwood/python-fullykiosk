@@ -170,6 +170,14 @@ class FullyKiosk:
         """
         return await self.sendCommand("getInstallApkState")
 
+    async def getInstalledApps(self):
+        """
+        Get list of installed app packages.
+
+        Returns a list of dicts containing package details (label, package, version, versionCode, icon).
+        """
+        return await self.sendCommand("manageApps")
+
     async def uninstallApp(self, application: str):
         """
         Uninstall an app package.
