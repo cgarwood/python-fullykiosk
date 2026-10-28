@@ -148,6 +148,36 @@ class FullyKiosk:
     async def startApplication(self, application):
         await self.sendCommand("startApplication", package=application)
 
+    async def loadApkFile(self, url: str, force_install: bool = False):
+        """
+        Download and launch APK file from URL.
+
+        :param url: URL to download the APK from.
+        :param force_install: If True, install will proceed even if this version
+        is already installed.
+        """
+        await self.sendCommand(
+            "loadApkFile",
+            url=url,
+            forceInstall="true" if force_install else "false",
+        )
+
+    async def getInstallApkState(self):
+        """
+        Get current APK installation status.
+
+        Returns JSON state of the APK installation process.
+        """
+        return await self.sendCommand("getInstallApkState")
+
+    async def uninstallApp(self, application: str):
+        """
+        Uninstall an app package.
+
+        :param application: Application package name to uninstall.
+        """
+        await self.sendCommand("uninstallApp", package=application)
+
     # Web browsing
 
     async def loadStartUrl(self):
