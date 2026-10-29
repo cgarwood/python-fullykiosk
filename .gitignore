@@ -1,3 +1,6 @@
+# Fully Kiosk password for running automated tests
+.testpw
+
 # Hide sublime text stuff
 *.sublime-project
 *.sublime-workspace
