@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=77"]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-fullykiosk"
-version = "0.0.17"
+dynamic = ["version"]
 description = "Python wrapper for Fully Kiosk Browser REST API"
 readme = "README.md"
 license = "Apache-2.0"
@@ -29,3 +29,6 @@ Source = "https://github.com/cgarwood/python-fullykiosk"
 
 [tool.setuptools.packages.find]
 include = ["fullykiosk*"]
+
+# Version is derived from the git tag of the published GitHub release
+[tool.setuptools_scm]
