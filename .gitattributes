@@ -1,0 +1,2 @@
+# Normalize text files to LF in the repo and working tree, regardless of core.autocrlf
+* text=auto eol=lf
