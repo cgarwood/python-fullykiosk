@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-fullykiosk"
+version = "0.0.17"
+description = "Python wrapper for Fully Kiosk Browser REST API"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Charles Garwood", email = "cgarwood@gmail.com" }]
+requires-python = ">=3.6"
+dependencies = ["aiohttp>=3.6.3"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Home Automation",
+]
+
+[project.urls]
+Homepage = "https://github.com/cgarwood/python-fullykiosk"
+Source = "https://github.com/cgarwood/python-fullykiosk"
+
+[tool.setuptools.packages.find]
+include = ["fullykiosk*"]
