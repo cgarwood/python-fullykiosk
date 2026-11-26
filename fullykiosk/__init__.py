@@ -1,14 +1,19 @@
 import aiohttp
+import asyncio
 import json
 import logging
 
 from .exceptions import FullyKioskError
+from .releases import Release, versionKey
 
 _LOGGER = logging.getLogger(__name__)
 
 RESPONSE_STATUS = "status"
 RESPONSE_STATUSTEXT = "statustext"
 RESPONSE_ERRORSTATUS = "Error"
+
+INSTALL_POLL_INTERVAL = 2
+INSTALL_POLL_TIMEOUT = 10
 
 
 class FullyKiosk:
@@ -170,6 +175,65 @@ class FullyKiosk:
         """
         return await self.sendCommand("getInstallApkState")
 
+    async def installRelease(self, release: Release, timeout: float = 300):
+        """
+        Install a release from getReleases() and wait until Fully runs it.
+
+        Fully restarts once the release is installed, so the API does not
+        respond for a while. Older and already installed versions are installed
+        with forceInstall.
+
+        :param release: The release to install.
+        :param timeout: Seconds to wait for the release to be running.
+
+        Raises FullyKioskError if the installation fails, and asyncio.TimeoutError
+        if the release is not running within the timeout.
+        """
+        installed = (await self.getDeviceInfo())["appVersionName"]
+        await self.loadApkFile(
+            release.url,
+            force_install=versionKey(release.version) <= versionKey(installed),
+        )
+        await asyncio.wait_for(
+            self._waitInstalled(release, reinstall=installed == release.versionName),
+            timeout,
+        )
+
+    async def _waitInstalled(self, release: Release, reinstall: bool):
+        started = False
+        while True:
+            await asyncio.sleep(INSTALL_POLL_INTERVAL)
+            try:
+                state = await asyncio.wait_for(
+                    self.getInstallApkState(), INSTALL_POLL_TIMEOUT
+                )
+            except (aiohttp.ClientError, asyncio.TimeoutError, FullyKioskError):
+                # Fully is restarting
+                continue
+
+            # A restarted Fully reports no URL
+            if state.get("url", release.url) != release.url:
+                continue
+            status = state.get("status")
+            if status == "failed":
+                raise FullyKioskError(status, state.get("statustext"))
+            if status in ("downloading", "installing"):
+                started = True
+                continue
+            started = started or status == "success"
+
+            try:
+                deviceInfo = await asyncio.wait_for(
+                    self.getDeviceInfo(), INSTALL_POLL_TIMEOUT
+                )
+            except (aiohttp.ClientError, asyncio.TimeoutError, FullyKioskError):
+                continue
+            # The version does not tell when a reinstallation is done
+            if deviceInfo.get("appVersionName") == release.versionName and (
+                started or not reinstall
+            ):
+                return
+
     async def getInstalledApps(self):
         """
         Get list of installed app packages.
@@ -293,9 +357,6 @@ class _RequestsHandler:
         _LOGGER.debug("Parameters: %s", params)
         async with self.session.get(**req_params) as response:
             if response.status != 200:
-                _LOGGER.warning(
-                    "Invalid response from Fully Kiosk Browser API: %s", response.status
-                )
                 raise FullyKioskError(response.status, await response.text())
 
             content_type = response.headers['Content-Type']
