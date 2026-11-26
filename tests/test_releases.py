@@ -8,7 +8,17 @@ import aiohttp
 
 from fullykiosk import FullyKiosk
 from fullykiosk.exceptions import FullyKioskError
-from fullykiosk.releases import Release, getApp, getRelease, getReleases
+from fullykiosk.releases import (
+    EDITION_EMM,
+    EDITION_PLAY,
+    EDITION_REGULAR,
+    Release,
+    canInstallApkSilently,
+    getApp,
+    getEdition,
+    getRelease,
+    getReleases,
+)
 
 FILES = "https://www.fully-kiosk.com/files/2026"
 FEED = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -65,6 +75,8 @@ class GetReleaseTest(unittest.IsolatedAsyncioTestCase):
             ({"appVersionName": "1.60.1-emm"}, "1.61.4-emm", LATEST_EMM),
             ({"appVersionName": "1.60.1-emm"}, "1.61.4", LATEST_EMM),
             ({"appVersionName": "1.60.1"}, "9.9.9", None),
+            ({"appVersionName": "1.54.1-play"}, None, LATEST),
+            ({"appVersionName": "1.60.1", "androidSdk": 22}, None, None),
         ]:
             with self.subTest(deviceInfo=deviceInfo, version=version):
                 self.assertEqual(getRelease(self.releases, deviceInfo, version), release)
@@ -73,6 +85,20 @@ class GetReleaseTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(getApp({}), "Fully-Kiosk-Browser")
         self.assertEqual(getApp({"packageName": "com.fullykiosk.videokiosk"}), "Fully-Video-Kiosk")
         self.assertIsNone(getApp({"packageName": "com.example"}))
+        self.assertIsNone(getApp({"androidSdk": 22}))
+
+    def test_edition(self):
+        for deviceInfo, edition, silent in [
+            ({"appVersionName": "1.60.1"}, EDITION_REGULAR, False),
+            ({"appVersionName": "1.60.1", "isRooted": True}, EDITION_REGULAR, True),
+            ({"appVersionName": "1.60.1-emm", "isDeviceOwner": True}, EDITION_EMM, True),
+            ({"appVersionName": "1.60.1", "packageName": "com.fullykiosk.emm"}, EDITION_EMM, False),
+            ({"appVersionName": "1.54.1-play", "isRooted": True}, EDITION_PLAY, False),
+            ({"appVersionName": "1.54.1", "installerSource": "com.android.vending"}, EDITION_PLAY, False),
+        ]:
+            with self.subTest(deviceInfo=deviceInfo):
+                self.assertEqual(getEdition(deviceInfo), edition)
+                self.assertEqual(canInstallApkSilently(deviceInfo), silent)
 
 
 @patch("fullykiosk.INSTALL_POLL_INTERVAL", 0)

@@ -17,6 +17,13 @@ _APK_FILENAME = re.compile(
     r"^(?P<app>[\w-]+)-v(?P<version>\d+(?:\.\d+)+)(?:-(?P<variant>[\w-]+))?\.apk$"
 )
 
+# The current releases need Android 6
+_MIN_ANDROID_SDK = 23
+
+EDITION_REGULAR = "regular"
+EDITION_EMM = "emm"
+EDITION_PLAY = "play"
+
 _BROWSER_APP = "Fully-Kiosk-Browser"
 _EMM_PACKAGE = "com.fullykiosk.emm"
 _APP_BY_PACKAGE = {
@@ -81,10 +88,38 @@ def _getPackage(deviceInfo: dict) -> str | None:
 
 
 def getApp(deviceInfo: dict) -> str | None:
-    """Return the name of the app in the releases, or None if it has no releases."""
+    """Return the name of the app in the releases, or None if the device can run none."""
+    if deviceInfo.get("androidSdk", _MIN_ANDROID_SDK) < _MIN_ANDROID_SDK:
+        return None
     if (package := _getPackage(deviceInfo)) is None:
         return _BROWSER_APP
     return _APP_BY_PACKAGE.get(package)
+
+
+def getEdition(deviceInfo: dict) -> str:
+    """
+    Return the edition of the app the device runs.
+
+    EDITION_PLAY is installed from Google Play and cannot install APK files,
+    EDITION_EMM is made for Android Enterprise, EDITION_REGULAR is the rest.
+    """
+    versionName = deviceInfo["appVersionName"]
+    if (
+        versionName.endswith("-play")
+        or deviceInfo.get("installerSource") == "com.android.vending"
+    ):
+        return EDITION_PLAY
+    if versionName.endswith("-emm") or _getPackage(deviceInfo) == _EMM_PACKAGE:
+        return EDITION_EMM
+    return EDITION_REGULAR
+
+
+def canInstallApkSilently(deviceInfo: dict) -> bool:
+    """Return True if APK files install without confirmation on the device's screen."""
+    # Android only allows it to device owners or with root
+    return getEdition(deviceInfo) != EDITION_PLAY and bool(
+        deviceInfo.get("isDeviceOwner") or deviceInfo.get("isRooted")
+    )
 
 
 def getRelease(
@@ -99,12 +134,8 @@ def getRelease(
     the edition suffix, like 1.61.4 or 1.61.4-emm.
     """
     app = getApp(deviceInfo)
-    variant = (
-        "emm"
-        if deviceInfo["appVersionName"].endswith("-emm")
-        or _getPackage(deviceInfo) == _EMM_PACKAGE
-        else None
-    )
+    # Google Play gets the regular releases
+    variant = "emm" if getEdition(deviceInfo) == EDITION_EMM else None
     return max(
         (
             release
