@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 
-from fullykiosk import FullyKiosk
+from fullykiosk import INSTALL_CONFIRMATION_TIMEOUT, INSTALL_TIMEOUT, FullyKiosk
 from fullykiosk.exceptions import FullyKioskError
 from fullykiosk.releases import (
     EDITION_EMM,
@@ -124,22 +124,43 @@ class InstallReleaseTest(unittest.IsolatedAsyncioTestCase):
         self.fully.loadApkFile.assert_awaited_once_with(LATEST.url, force_install=False)
 
     async def test_downgrade(self):
-        self.installed("1.61.4", "1.61.3")
-        self.fully.getInstallApkState.return_value = {"status": "success"}
-        await self.fully.installRelease(PREVIOUS)
-        self.fully.loadApkFile.assert_awaited_once_with(PREVIOUS.url, force_install=True)
+        self.installed("1.61.4")
+        with self.assertRaises(FullyKioskError):
+            await self.fully.installRelease(PREVIOUS)
+        self.fully.loadApkFile.assert_not_awaited()
 
     async def test_reinstall(self):
         self.fully.getDeviceInfo.return_value = {"appVersionName": "1.61.4-emm"}
-        self.fully.getInstallApkState.side_effect = [
-            {"url": LATEST_EMM.url, "status": "idle"},
-            {"url": LATEST_EMM.url, "status": "downloading"},
-            FullyKioskError(500, ""),
-            {"url": LATEST_EMM.url, "status": "idle"},
-        ]
-        await self.fully.installRelease(LATEST_EMM)
-        self.fully.loadApkFile.assert_awaited_once_with(LATEST_EMM.url, force_install=True)
-        self.assertEqual(self.fully.getInstallApkState.await_count, 4)
+        downloading = {"url": LATEST_EMM.url, "status": "downloading"}
+        installing = {"url": LATEST_EMM.url, "status": "installing"}
+        for states in (
+            # Reported end
+            [{"url": LATEST_EMM.url, "status": "idle"}, downloading, installing, {"status": "idle"}],
+            # Rooted devices keep reporting installing, but Fully restarts
+            [downloading, installing, installing, FullyKioskError(500, ""), installing],
+        ):
+            with self.subTest(states=states):
+                self.fully.getInstallApkState.reset_mock()
+                self.fully.getInstallApkState.side_effect = states
+                await self.fully.installRelease(LATEST_EMM)
+                self.fully.loadApkFile.assert_awaited_with(LATEST_EMM.url, force_install=True)
+                self.assertEqual(self.fully.getInstallApkState.await_count, len(states))
+
+    async def test_upgrade_reporting_installing(self):
+        self.installed("1.61.3", "1.61.3", "1.61.4")
+        self.fully.getInstallApkState.return_value = {"url": LATEST.url, "status": "installing"}
+        await self.fully.installRelease(LATEST, timeout=1)
+
+    async def test_default_timeout(self):
+        self.fully._waitInstalled = MagicMock()
+        for deviceInfo, timeout in (
+            ({"appVersionName": "1.61.3", "isRooted": True}, INSTALL_TIMEOUT),
+            ({"appVersionName": "1.61.3"}, INSTALL_CONFIRMATION_TIMEOUT),
+        ):
+            with self.subTest(deviceInfo=deviceInfo), patch("asyncio.wait_for") as waitFor:
+                self.fully.getDeviceInfo.return_value = deviceInfo
+                await self.fully.installRelease(LATEST)
+                self.assertEqual(waitFor.call_args.args[1], timeout)
 
     async def test_restarting(self):
         self.fully.getDeviceInfo.side_effect = [
@@ -151,7 +172,7 @@ class InstallReleaseTest(unittest.IsolatedAsyncioTestCase):
         await self.fully.installRelease(LATEST)
 
     async def test_failed(self):
-        self.installed("1.61.3")
+        self.fully.getDeviceInfo.return_value = {"appVersionName": "1.61.3"}
         self.fully.getInstallApkState.side_effect = [
             {"url": LATEST.url, "status": "downloading"},
             {"url": LATEST.url, "status": "failed", "statustext": "Cancelled"},

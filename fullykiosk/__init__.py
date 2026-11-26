@@ -4,7 +4,7 @@ import json
 import logging
 
 from .exceptions import FullyKioskError
-from .releases import Release, versionKey
+from .releases import Release, canInstallApkSilently, versionKey
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,6 +14,9 @@ RESPONSE_ERRORSTATUS = "Error"
 
 INSTALL_POLL_INTERVAL = 2
 INSTALL_POLL_TIMEOUT = 10
+INSTALL_TIMEOUT = 300
+# Someone has to walk to the device to confirm the installation
+INSTALL_CONFIRMATION_TIMEOUT = 900
 
 
 class FullyKiosk:
@@ -175,31 +178,44 @@ class FullyKiosk:
         """
         return await self.sendCommand("getInstallApkState")
 
-    async def installRelease(self, release: Release, timeout: float = 300):
+    async def installRelease(self, release: Release, timeout=None):
         """
         Install a release from getReleases() and wait until Fully runs it.
 
         Fully restarts once the release is installed, so the API does not
-        respond for a while. Older and already installed versions are installed
-        with forceInstall.
+        respond for a while. The installed version is reinstalled with
+        forceInstall. Android cannot install an older version over a newer one.
 
         :param release: The release to install.
-        :param timeout: Seconds to wait for the release to be running.
+        :param timeout: Seconds to wait for the release to be running. Defaults
+        to INSTALL_TIMEOUT, or INSTALL_CONFIRMATION_TIMEOUT when someone has
+        to confirm the installation on the device's screen.
 
-        Raises FullyKioskError if the installation fails, and asyncio.TimeoutError
-        if the release is not running within the timeout.
+        Raises FullyKioskError if the release is older than the installed
+        version or the installation fails, and asyncio.TimeoutError if the
+        release is not running within the timeout.
         """
-        installed = (await self.getDeviceInfo())["appVersionName"]
-        await self.loadApkFile(
-            release.url,
-            force_install=versionKey(release.version) <= versionKey(installed),
-        )
-        await asyncio.wait_for(
-            self._waitInstalled(release, reinstall=installed == release.versionName),
-            timeout,
-        )
+        deviceInfo = await self.getDeviceInfo()
+        installed = deviceInfo["appVersionName"]
+        if versionKey(release.version) < versionKey(installed):
+            raise FullyKioskError(
+                "Error", f"Cannot downgrade from {installed} to {release.versionName}"
+            )
+        if timeout is None:
+            timeout = (
+                INSTALL_TIMEOUT
+                if canInstallApkSilently(deviceInfo)
+                else INSTALL_CONFIRMATION_TIMEOUT
+            )
+        reinstall = installed == release.versionName
+        await self.loadApkFile(release.url, force_install=reinstall)
+        await asyncio.wait_for(self._waitInstalled(release, reinstall), timeout)
 
     async def _waitInstalled(self, release: Release, reinstall: bool):
+        # Rooted devices can report installing after the installation, so only
+        # the version tells when an upgrade is done. A reinstallation keeps the
+        # version, so it is done once Fully restarts or reports the end.
+        done = not reinstall
         started = False
         while True:
             await asyncio.sleep(INSTALL_POLL_INTERVAL)
@@ -208,7 +224,8 @@ class FullyKiosk:
                     self.getInstallApkState(), INSTALL_POLL_TIMEOUT
                 )
             except (aiohttp.ClientError, asyncio.TimeoutError, FullyKioskError):
-                # Fully is restarting
+                # Fully is restarting with the installed release
+                done = True
                 continue
 
             # A restarted Fully reports no URL
@@ -219,8 +236,10 @@ class FullyKiosk:
                 raise FullyKioskError(status, state.get("statustext"))
             if status in ("downloading", "installing"):
                 started = True
+            elif started:
+                done = True
+            if not done:
                 continue
-            started = started or status == "success"
 
             try:
                 deviceInfo = await asyncio.wait_for(
@@ -228,10 +247,7 @@ class FullyKiosk:
                 )
             except (aiohttp.ClientError, asyncio.TimeoutError, FullyKioskError):
                 continue
-            # The version does not tell when a reinstallation is done
-            if deviceInfo.get("appVersionName") == release.versionName and (
-                started or not reinstall
-            ):
+            if deviceInfo.get("appVersionName") == release.versionName:
                 return
 
     async def getInstalledApps(self):
