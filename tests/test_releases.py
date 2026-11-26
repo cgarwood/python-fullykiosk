@@ -6,7 +6,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 
-from fullykiosk import INSTALL_CONFIRMATION_TIMEOUT, INSTALL_TIMEOUT, FullyKiosk
+from fullykiosk import (
+    INSTALL_CONFIRMATION_TIMEOUT,
+    INSTALL_STATUS_AWAITING_CONFIRMATION,
+    INSTALL_STATUS_DOWNLOADING,
+    INSTALL_STATUS_INSTALLING,
+    INSTALL_STATUS_RESTARTING,
+    INSTALL_TIMEOUT,
+    FullyKiosk,
+)
 from fullykiosk.exceptions import FullyKioskError
 from fullykiosk.releases import (
     EDITION_EMM,
@@ -145,6 +153,29 @@ class InstallReleaseTest(unittest.IsolatedAsyncioTestCase):
                 await self.fully.installRelease(LATEST_EMM)
                 self.fully.loadApkFile.assert_awaited_with(LATEST_EMM.url, force_install=True)
                 self.assertEqual(self.fully.getInstallApkState.await_count, len(states))
+
+    async def test_status(self):
+        for deviceInfo, installing in (
+            ({"isRooted": True}, INSTALL_STATUS_INSTALLING),
+            ({}, INSTALL_STATUS_AWAITING_CONFIRMATION),
+        ):
+            with self.subTest(deviceInfo=deviceInfo):
+                self.fully.getDeviceInfo.side_effect = [
+                    {**deviceInfo, "appVersionName": version}
+                    for version in ("1.61.3", "1.61.3", "1.61.3", "1.61.4")
+                ]
+                self.fully.getInstallApkState.side_effect = [
+                    {"url": LATEST.url, "status": "downloading"},
+                    {"url": LATEST.url, "status": "installing"},
+                    aiohttp.ClientError(),
+                    {"status": "idle"},
+                ]
+                onStatus = MagicMock()
+                await self.fully.installRelease(LATEST, onStatus=onStatus)
+                self.assertEqual(
+                    [call.args[0] for call in onStatus.call_args_list],
+                    [INSTALL_STATUS_DOWNLOADING, installing, INSTALL_STATUS_RESTARTING],
+                )
 
     async def test_upgrade_reporting_installing(self):
         self.installed("1.61.3", "1.61.3", "1.61.4")

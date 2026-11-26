@@ -18,6 +18,12 @@ INSTALL_TIMEOUT = 300
 # Someone has to walk to the device to confirm the installation
 INSTALL_CONFIRMATION_TIMEOUT = 900
 
+INSTALL_STATUS_DOWNLOADING = "downloading"
+INSTALL_STATUS_INSTALLING = "installing"
+# Waits for someone to confirm the installation on the device's screen
+INSTALL_STATUS_AWAITING_CONFIRMATION = "awaiting_confirmation"
+INSTALL_STATUS_RESTARTING = "restarting"
+
 
 class FullyKiosk:
     def __init__(self, session, host, port, password, use_ssl=False, verify_ssl=False):
@@ -178,7 +184,7 @@ class FullyKiosk:
         """
         return await self.sendCommand("getInstallApkState")
 
-    async def installRelease(self, release: Release, timeout=None):
+    async def installRelease(self, release: Release, timeout=None, onStatus=None):
         """
         Install a release from getReleases() and wait until Fully runs it.
 
@@ -190,6 +196,8 @@ class FullyKiosk:
         :param timeout: Seconds to wait for the release to be running. Defaults
         to INSTALL_TIMEOUT, or INSTALL_CONFIRMATION_TIMEOUT when someone has
         to confirm the installation on the device's screen.
+        :param onStatus: Called with an INSTALL_STATUS_* constant each time the
+        installation moves to another status. Fully reports no percentage.
 
         Raises FullyKioskError if the release is older than the installed
         version or the installation fails, and asyncio.TimeoutError if the
@@ -201,17 +209,26 @@ class FullyKiosk:
             raise FullyKioskError(
                 "Error", f"Cannot downgrade from {installed} to {release.versionName}"
             )
+        silent = canInstallApkSilently(deviceInfo)
         if timeout is None:
-            timeout = (
-                INSTALL_TIMEOUT
-                if canInstallApkSilently(deviceInfo)
-                else INSTALL_CONFIRMATION_TIMEOUT
-            )
+            timeout = INSTALL_TIMEOUT if silent else INSTALL_CONFIRMATION_TIMEOUT
         reinstall = installed == release.versionName
         await self.loadApkFile(release.url, force_install=reinstall)
-        await asyncio.wait_for(self._waitInstalled(release, reinstall), timeout)
+        await asyncio.wait_for(
+            self._waitInstalled(release, reinstall, silent, onStatus), timeout
+        )
 
-    async def _waitInstalled(self, release: Release, reinstall: bool):
+    async def _waitInstalled(self, release, reinstall, silent, onStatus):
+        reported = None
+
+        def report(status):
+            nonlocal reported
+            if onStatus is not None and status != reported:
+                reported = status
+                onStatus(status)
+
+        # Fully starts downloading right away
+        report(INSTALL_STATUS_DOWNLOADING)
         # Rooted devices can report installing after the installation, so only
         # the version tells when an upgrade is done. A reinstallation keeps the
         # version, so it is done once Fully restarts or reports the end.
@@ -225,6 +242,7 @@ class FullyKiosk:
                 )
             except (aiohttp.ClientError, asyncio.TimeoutError, FullyKioskError):
                 # Fully is restarting with the installed release
+                report(INSTALL_STATUS_RESTARTING)
                 done = True
                 continue
 
@@ -234,9 +252,19 @@ class FullyKiosk:
             status = state.get("status")
             if status == "failed":
                 raise FullyKioskError(status, state.get("statustext"))
-            if status in ("downloading", "installing"):
+            if status == "downloading":
                 started = True
+                report(INSTALL_STATUS_DOWNLOADING)
+            elif status == "installing":
+                started = True
+                report(
+                    INSTALL_STATUS_INSTALLING
+                    if silent
+                    else INSTALL_STATUS_AWAITING_CONFIRMATION
+                )
             elif started:
+                # Android restarts Fully once the release is installed
+                report(INSTALL_STATUS_RESTARTING)
                 done = True
             if not done:
                 continue
